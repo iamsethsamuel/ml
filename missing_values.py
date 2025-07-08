@@ -6,6 +6,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 
+from utils import score_dataset
+
 
 # Download latest version
 print("Downloading dataset")
@@ -29,12 +31,6 @@ print("Splitting test and validation data")
 # split data into training and validation data
 train_x, val_x, train_y, val_y = train_test_split(X, y,train_size=0.8, test_size=0.2, random_state=0)
 
-def score_dataset(x_train, x_val, y_train, y_val):
-    model = RandomForestRegressor(n_estimators=10, random_state=0)
-    print("Training model")
-    model.fit(x_train, y_train)
-    pred = model.predict(x_val)
-    return mean_absolute_error(y_val, pred)
 
 
 # Drop Columns with Missing Values

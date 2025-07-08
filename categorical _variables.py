@@ -1,11 +1,10 @@
 import pandas as pd;
 import kagglehub
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
-
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+from utils import score_dataset
 
 # Download latest version
 print("Downloading dataset")
@@ -27,32 +26,66 @@ X = melbourne_data.drop(["Price"], axis=1)
 
 print("Splitting test and validation data")
 # split data into training and validation data
-train_x, val_x, train_y, val_y = train_test_split(X, y,train_size=0.8, test_size=0.2, random_state=0)
+full_train_x, full_val_x, train_y, val_y = train_test_split(X, y,train_size=0.8, test_size=0.2, random_state=0)
 
-# Get list of categorical variables
-cat_var = (train_x.dtypes == 'object')
+cols_with_missing = [col for col in full_train_x.columns if full_train_x[col].isnull().any()]
+full_train_x.drop(cols_with_missing, axis=1, inplace=True)
+full_val_x.drop(cols_with_missing, axis=1, inplace=True)
+
+# "Cardinality" means the number of unique values in a column
+# Select categorical columns with relatively low cardinality (convenient but arbitrary)
+low_cardinality_cols = [cols for cols in full_train_x.columns if full_train_x[cols].nunique() < 10 and full_train_x[cols].dtype == "object"]
+
+# Select numerical columns
+numerical_cols = [col for col in full_train_x.columns if full_train_x[col].dtype in ["int64", "float64"]]
+
+cols = low_cardinality_cols + numerical_cols
+train_x = full_train_x[cols].copy()
+val_x = full_val_x[cols].copy()
+
+
+
+
+# Ordinal Encoding
+l_train_x = train_x.copy()
+l_val_x = val_x.copy()
+
+# Get list of categorical variables (Columns with strings as rows)
+cat_var = (l_train_x.dtypes == 'object')
 object_cols = list(cat_var[cat_var].index)
-print("Cat_Var: ", cat_var)
-print("Categorical variables:", object_cols)
 
-# def score_dataset(x_train, x_val, y_train, y_val):
-#     model = RandomForestRegressor(n_estimators=10, random_state=0)
-#     print("Training model")
-#     model.fit(x_train, y_train)
-#     pred = model.predict(x_val)
-#     return mean_absolute_error(y_val, pred)
+ordinal = OrdinalEncoder()
+l_train_x[object_cols] = ordinal.fit_transform(train_x[object_cols])
+l_val_x[object_cols] = ordinal.transform(val_x[object_cols])
+
+print("MAE from Approach 2 (Ordinal Encoding):") 
+print(score_dataset(l_train_x,l_val_x, train_y, val_y))
 
 
 
+# Hot Encoding
 
-# Imputation
-# imputer = SimpleImputer()
-# imputed_x_train = pd.DataFrame(imputer.fit_transform(train_x))
-# imputed_x_val = pd.DataFrame(imputer.fit_transform(val_x))
+hot_endoder =  OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+hot_train = pd.DataFrame(hot_endoder.fit_transform(l_train_x[object_cols]))
+hot_val = pd.DataFrame(hot_endoder.transform((l_val_x[object_cols])))
 
-# # Imputation removed column names; put them back
-# imputed_x_train.columns = train_x.columns
-# imputed_x_val.columns = val_x.columns
+# One-hot encoding removed index; put it back
+hot_train.index = train_x.index
+hot_val.index = val_x.index
 
-# print("\n\r MAE from Approach 2 (Imputation):")
-# print(score_dataset(imputed_x_train, imputed_x_val, train_y, val_y))
+
+# Remove categorical columns (will replace with one-hot encoding)
+num_x_train = train_x.drop(object_cols, axis=1)
+num_val_x = val_x.drop(object_cols, axis=1)
+
+# Add one-hot encoded columns to numerical features
+hot_x_train = pd.concat([hot_train, num_x_train], axis=1)
+hot_x_val = pd.concat([hot_val, num_val_x], axis=1)
+
+# Ensure all columns have string type
+hot_x_train.columns = hot_x_train.columns.astype(str)
+hot_x_val.columns = hot_x_val.columns.astype(str)
+
+
+print("MAE from Approach 3 (One-Hot Encoding):") 
+print(score_dataset(hot_x_train, hot_x_val,train_y, val_y))
