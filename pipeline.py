@@ -57,11 +57,13 @@ print("Preprocessing and fitting the data")
 fit = my_pipeline.fit(train_x, train_y)
 
 print("The first value in the training data is: ")
-print(val_x.iloc[0])
+print(full_val_x.iloc[0])
 
 print("Predicting...")
-preds = my_pipeline.predict(val_x.iloc[[0]])
-print(preds)
+mp = my_pipeline.predict(full_val_x.iloc[[0]])
+print(mp)
+
+preds = my_pipeline.predict(val_x)
 
 
 
